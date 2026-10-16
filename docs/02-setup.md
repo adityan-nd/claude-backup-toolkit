@@ -1,8 +1,11 @@
 # Setup / prerequisites
 
+**Fastest path:** `install.sh` does everything on this page in one command
+(see the main README). This page explains what it does, for doing it by hand.
+
 To run this system (or replicate it in your own repo) you need:
 
-- **bash** (scripts use `set -euo pipefail`, arrays — bash 4+)
+- **bash** — the macOS built-in bash 3.2 is enough
 - **python3** — used for JSON parsing (session titles, `cwd` extraction) and
   the index/naming logic. No third-party packages; stdlib only
   (`json`, `csv`, `os`, `re`, `datetime`, `sys`).

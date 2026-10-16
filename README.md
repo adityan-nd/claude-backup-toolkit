@@ -15,97 +15,103 @@ backed-up copy stays.
 
 ```
  THIS repo (public)                 YOUR repo (private)
- claude-backup-toolkit   ──clone──▶  ~/my-claude-backup  ──push──▶  github.com/<you>/my-claude-backup
+ claude-backup-toolkit   ──setup──▶  ~/my-claude-backup  ──push──▶  github.com/<you>/my-claude-backup
  just the scripts                    scripts + your chats,
                                      skills, memory
 ```
 
-You clone this repo **once**, turn the copy into your own private repo, and
-from then on run one command whenever you want something backed up.
+Setup runs **once**. After that, one command whenever you want something
+backed up.
 
 ---
 
-## Part 1 — One-time setup
+## Part 1 — One-time setup (one command)
 
-### Before you start
+### You need
 
-Paste this. Every line should print a version or "Logged in". If one fails,
-install that tool first.
+`git`, `python3`, `rsync`, and the GitHub CLI logged in (`gh auth login`).
+The installer checks all of these and tells you exactly what's missing.
+
+### Option A: run it yourself
+
+Paste into a terminal:
 
 ```bash
-bash --version | head -1
-python3 --version
-rsync --version | head -1
-git --version
-gh auth status          # if "not logged in": run  gh auth login
+bash <(curl -fsSL https://raw.githubusercontent.com/adityan-nd/claude-backup-toolkit/main/install.sh)
 ```
 
-### Setup (copy-paste the whole block)
+That's the whole setup. It:
 
-Replace `my-claude-backup` if you want a different name.
+1. creates `~/my-claude-backup` from this toolkit and disconnects it from this
+   public repo, so your data can never be pushed here,
+2. copies in your chats, skills, and memory (folders get readable names like
+   `chats/my-app` automatically),
+3. scans for leaked passwords/API keys and **stops without uploading** if it
+   finds any,
+4. creates a **private** GitHub repo `my-claude-backup` under your account and
+   pushes the first backup.
+
+Want a different folder or repo name? Add them at the end:
+`bash <(curl ...install.sh) ~/backups/claude claude-backup-2026`
+
+### Option B: let Claude do it
+
+Open any Claude Code chat (any model works, even the smallest, since it only
+runs one command) and paste:
+
+```
+Set up my Claude backup. Run this one command and tell me the result:
+bash <(curl -fsSL https://raw.githubusercontent.com/adityan-nd/claude-backup-toolkit/main/install.sh)
+If it reports a missing tool or a possible secret, explain in plain words
+what I need to do and stop. Don't work around it.
+```
+
+Claude will ask you to approve the command (or runs it directly if you've
+turned on bypass permissions).
+
+### When it's done
+
+You'll see:
+
+```
+Done. Your private backup repo: https://github.com/<you>/my-claude-backup
+Local folder: /Users/<you>/my-claude-backup
+```
+
+Open that link and click `chats/INDEX.md`: a table of every chat with its
+title and project.
+
+**If it stopped on "possible secret":** nothing was uploaded. Open the listed
+file, remove the key (and rotate it, since it was exposed), then run the
+finish command the installer printed.
+
+### Optional: repos with their own `.claude/` folder
+
+If some of your repos keep project rules or skills in a `.claude/` folder,
+add their paths to the `REPOS` list near the top of
+`~/my-claude-backup/backup_claude.sh`:
 
 ```bash
-# 1. Get the scripts into a new folder of your own
+REPOS=(
+  "/Users/alice/code/my-app"
+)
+```
+
+<details>
+<summary>Manual setup (what the installer does, step by step)</summary>
+
+```bash
 git clone https://github.com/adityan-nd/claude-backup-toolkit.git ~/my-claude-backup
 cd ~/my-claude-backup
-
-# 2. Cut the link to this public repo, so your data can never be pushed here
-git remote remove origin
-
-# 3. Make the scripts runnable
+git remote remove origin            # never push your data to the public toolkit
 chmod +x *.sh
-
-# 4. Create YOUR private GitHub repo and connect this folder to it
+./backup_claude.sh                  # copies everything in; does NOT upload
+# check for secrets: see docs/03-scripts.md#secret-hygiene
 gh repo create my-claude-backup --private --source=. --remote=origin
-
-# 5. Copy everything in (chats, skills, memory) — this does NOT upload yet
-./backup_claude.sh
+git add -A && git commit -m "First backup" && git push -u origin main
 ```
 
-You should see something like:
-
-```
-Rebuilt index: 42 sessions.
-Backup refreshed at: /Users/alice/my-claude-backup
-```
-
-### Check, then upload
-
-Chats contain whatever you ever pasted into Claude. If you might have pasted a
-password or API key, run the scan in
-[docs/03-scripts.md](docs/03-scripts.md#secret-hygiene) first. Then:
-
-```bash
-git add -A
-git commit -m "First backup"
-git push -u origin main
-```
-
-Open `https://github.com/<you>/my-claude-backup` and click `chats/INDEX.md`:
-a table of every chat with its title and project. **Setup done.**
-
-### Optional: nicer folder names
-
-Your chats land in folders like `chats/-Users-alice-code-my-app` (Claude
-Code's internal name for `/Users/alice/code/my-app`). To get `chats/my-app`
-instead, see what folders you have:
-
-```bash
-ls ~/.claude/projects/
-```
-
-and add a line per project to `STATIC_MAP` in `names.py`:
-
-```python
-STATIC_MAP = {
-    "-Users-alice-code-my-app": "my-app",
-}
-```
-
-Already-backed-up folders need a one-time rename; see
-[docs/04-naming.md](docs/04-naming.md). If some of your repos have their own
-`.claude/` folder (project rules, project skills), add their paths to the
-`REPOS` list in `backup_claude.sh` too.
+</details>
 
 ---
 
@@ -260,10 +266,12 @@ look it up in `chats/INDEX.md`.
 | Problem | Fix |
 |---|---|
 | `gh: command not found` / not logged in | Install GitHub CLI, then `gh auth login` |
-| `Permission denied` running a script | `chmod +x *.sh` |
-| `backup_one_*.sh` fails at `git push` | Folder has no remote yet: run step 4 of setup |
+| `git has no identity` | `git config --global user.name "Your Name"` and `git config --global user.email you@example.com` |
+| `... already exists` from the installer | You already set up. Use the backup commands in Part 2, or pass a new folder name |
+| `Permission denied` running a script | `chmod +x ~/my-claude-backup/*.sh` |
+| `backup_one_*.sh` fails at `git push` | Folder isn't connected to GitHub yet: run the finish command the installer printed |
 | `Session ... not found` | Use the id from the `.jsonl` file name (see example above), not the id in the Claude desktop app, which starts with `local_` and can differ |
-| Ugly folder like `chats/-Users-alice-...` | Add it to `STATIC_MAP` in `names.py` ([docs/04-naming.md](docs/04-naming.md)) |
+| A chat folder has an ugly name like `chats/-Users-alice-...` | None of its chats recorded the project's real path, so no name could be worked out. Pick one in `STATIC_MAP` in `names.py` ([docs/04-naming.md](docs/04-naming.md)) |
 | `project-configs/` is empty | Normal unless you added repos to `REPOS` in `backup_claude.sh` |
 
 ---
