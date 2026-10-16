@@ -78,8 +78,9 @@ Done. Your private backup repo: https://github.com/<you>/my-claude-backup
 Local folder: /Users/<you>/my-claude-backup
 ```
 
-Open that link and click `chats/INDEX.md`: a table of every chat with its
-title and project.
+Open that link. Its front page is a README written for **your** backup: what's
+in it, and every backup command ready to copy with your folder path filled in.
+`chats/INDEX.md` lists every chat with its title and project.
 
 **If it stopped on "possible secret":** nothing was uploaded. Open the listed
 file, remove the key (and rotate it, since it was exposed), then run the

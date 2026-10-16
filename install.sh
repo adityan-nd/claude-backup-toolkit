@@ -34,6 +34,14 @@ cd "$DIR"
 git remote remove origin  # your data must never be pushed to the public toolkit repo
 chmod +x ./*.sh
 
+# Swap the toolkit's README for one about YOUR backup, with your real folder path.
+python3 - "$(pwd)" <<'PY'
+import sys
+text = open("BACKUP_README.md").read().replace("__BACKUP_DIR__", sys.argv[1])
+open("README.md", "w").write(text)
+PY
+rm BACKUP_README.md
+
 echo "==> Copying your chats, skills and memory"
 ./backup_claude.sh
 
