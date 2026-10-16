@@ -46,32 +46,14 @@ echo "==> Copying your chats, skills and memory"
 ./backup_claude.sh
 
 echo "==> Checking for secrets before anything is uploaded"
-if ! python3 - "$DIR" <<'PY'
-import os, re, sys
-root = sys.argv[1]
-pat = re.compile(r"AKIA[0-9A-Z]{16}|BEGIN (RSA|EC|OPENSSH|PGP) PRIVATE KEY|"
-                 r"xox[baprs]-[0-9A-Za-z-]+|ghp_[0-9A-Za-z]{36}|AIza[0-9A-Za-z_-]{35}")
-hits = []
-for dirpath, dirs, files in os.walk(root):
-    dirs[:] = [d for d in dirs if d != ".git"]
-    for f in files:
-        p = os.path.join(dirpath, f)
-        try:
-            with open(p, errors="ignore") as fh:
-                if pat.search(fh.read()):
-                    hits.append(os.path.relpath(p, root))
-        except OSError:
-            pass
-for h in hits:
-    print("  possible secret in:", h)
-sys.exit(1 if hits else 0)
-PY
-then
+if ! python3 scan_secrets.py "$DIR"; then
   cat <<EOF
 
 Possible secrets found (listed above). NOTHING was uploaded.
-Open those files and check. If a real key is there, delete it from the file
-(and rotate that key). When it's clean, finish setup with:
+Open each file and check. If a real key is there: rotate that key, then delete
+it from the file here AND from the file with the same name under
+~/.claude/projects/ (or the next backup copies it back). To re-check: python3 scan_secrets.py "$DIR"
+When it's clean, finish setup with:
 
   cd "$DIR" && gh repo create "$NAME" --private --source=. --remote=origin \\
     && git add -A && git commit -m "First backup" && git push -u origin main

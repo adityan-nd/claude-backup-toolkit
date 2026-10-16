@@ -107,7 +107,7 @@ cd ~/my-claude-backup
 git remote remove origin            # never push your data to the public toolkit
 chmod +x *.sh
 ./backup_claude.sh                  # copies everything in; does NOT upload
-# check for secrets: see docs/03-scripts.md#secret-hygiene
+python3 scan_secrets.py .           # must print nothing before you upload
 gh repo create my-claude-backup --private --source=. --remote=origin
 git add -A && git commit -m "First backup" && git push -u origin main
 ```

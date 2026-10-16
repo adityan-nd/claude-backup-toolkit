@@ -31,10 +31,11 @@ Run in any terminal, from any folder. Claude Code doesn't need to be open.
 | One memory file | `"__BACKUP_DIR__/backup_one_memory.sh" <file-name>` |
 | Everything | `"__BACKUP_DIR__/backup_claude.sh"`, then push (below) |
 
-The first four upload by themselves. **Everything** only copies, so push after it:
+The first four upload by themselves. **Everything** only copies, so push after
+it. The secret check runs first and stops the push if it finds a key:
 
 ```bash
-cd "__BACKUP_DIR__" && git add -A && git commit -m "Backup" && git push
+cd "__BACKUP_DIR__" && python3 scan_secrets.py . && git add -A && git commit -m "Backup" && git push
 ```
 
 Running a command again on the same chat, skill, or file **updates** it. It

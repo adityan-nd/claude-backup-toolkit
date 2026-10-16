@@ -67,27 +67,28 @@ usually want "just back up all of it" rather than naming each file.
 
 ## Secret hygiene
 
-Before the very first push (and anytime you add a new kind of file to the
-backup), scan for obvious secret patterns. Recursive `grep -r` / `find`
-whole-tree scans can be slow or blocked by some tool-call guards — a small
-Python walk is reliable:
+Before the very first push (and anytime you're unsure), scan the backup
+folder. `install.sh` runs this automatically and refuses to upload if it
+finds anything:
 
-```python
-import os, re
-pat = re.compile(r"AKIA[0-9A-Z]{16}|BEGIN (RSA|EC|OPENSSH|PGP) PRIVATE KEY|"
-                  r"xox[baprs]-[0-9A-Za-z-]+|ghp_[0-9A-Za-z]{36}|AIza[0-9A-Za-z_-]{35}")
-for dirpath, _, files in os.walk("."):
-    if ".git" in dirpath.split(os.sep):
-        continue
-    for f in files:
-        p = os.path.join(dirpath, f)
-        try:
-            with open(p, errors="ignore") as fh:
-                if pat.search(fh.read()):
-                    print("FLAGGED:", p)
-        except Exception:
-            pass
+```bash
+python3 scan_secrets.py .
 ```
 
-Treat every hit as a real finding until you've opened the file and confirmed
-it's a false positive (test fixture, placeholder, etc.) — don't skip the read.
+It looks for AWS access key IDs, GitHub tokens, Slack tokens, Google API keys,
+and private keys, and prints each file with a short masked preview. It
+deliberately ignores things that look like secrets but aren't:
+
+- an AWS key ID inside a pre-signed S3 link (`X-Amz-Credential=AKIA…`): the ID
+  alone isn't a secret, and these links show up constantly in chats,
+- obvious fakes from docs and tests: all zeros, repeated characters,
+  `EXAMPLE`, alphabet runs like `0123456789ABCDEF`,
+- a private-key header mentioned in text with no actual key after it.
+
+`python3 scan_secrets.py --self-test` checks these rules still catch real-shaped
+secrets and skip the fakes.
+
+Treat every hit as real until you've opened the file and confirmed otherwise.
+If it is real: rotate the key first, then remove it from the backup file
+**and** from the original under `~/.claude/projects/`, or the next backup
+copies it back.
