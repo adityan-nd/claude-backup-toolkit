@@ -28,10 +28,30 @@ for SID in "$@"; do
         rsync -a --exclude='.DS_Store' "${projdir}${SID}/" "$DEST/chats/$clean/${SID}/"
       fi
 
-      title="$SID"
-      if [ -f "${projdir}${SID}/custom-title.json" ]; then
-        title="$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('title','$SID'))" "${projdir}${SID}/custom-title.json" 2>/dev/null || echo "$SID")"
-      fi
+      title="$(python3 -c "
+import json, sys
+jsonl_path, sidecar_path, sid = sys.argv[1], sys.argv[2], sys.argv[3]
+title = None
+try:
+    with open(jsonl_path, errors='ignore') as f:
+        for line in f:
+            try:
+                d = json.loads(line)
+            except Exception:
+                continue
+            if d.get('type') == 'custom-title' and d.get('customTitle'):
+                title = d['customTitle']
+except Exception:
+    pass
+if not title:
+    try:
+        with open(sidecar_path) as f:
+            d = json.load(f)
+            title = d.get('customTitle') or d.get('title')
+    except Exception:
+        pass
+print(title or sid)
+" "${projdir}${SID}.jsonl" "${projdir}${SID}/custom-title.json" "$SID" 2>/dev/null || echo "$SID")"
       cwd="$(python3 -c "
 import json,sys
 try:

@@ -55,12 +55,31 @@ def extract_cwd(jsonl_path):
         pass
     return ""
 
-def extract_title(slug_dir, session_id):
+def extract_title(jsonl_path, slug_dir, session_id):
+    # Authoritative source: the LAST "custom-title" event inside the session's
+    # own transcript — sessions get renamed/forked over time, so later entries
+    # override earlier ones. The sidecar custom-title.json can be stale.
+    title = None
+    try:
+        with open(jsonl_path, errors='ignore') as f:
+            for line in f:
+                try:
+                    d = json.loads(line)
+                except Exception:
+                    continue
+                if d.get('type') == 'custom-title' and d.get('customTitle'):
+                    title = d['customTitle']
+    except Exception:
+        pass
+    if title:
+        return title
+
     title_path = os.path.join(slug_dir, session_id, "custom-title.json")
     if os.path.exists(title_path):
         try:
             with open(title_path) as f:
-                t = json.load(f).get("title")
+                d = json.load(f)
+                t = d.get("customTitle") or d.get("title")
                 if t:
                     return t
         except Exception:
@@ -87,7 +106,7 @@ def cmd_rebuild(dest):
                 continue
             session_id = fname[:-len(".jsonl")]
             jsonl_path = os.path.join(slug_dir, fname)
-            title = extract_title(slug_dir, session_id)
+            title = extract_title(jsonl_path, slug_dir, session_id)
             cwd = extract_cwd(jsonl_path)
             prev = existing.get(session_id)
             ts = prev[4] if prev else now
