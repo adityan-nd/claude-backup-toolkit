@@ -111,7 +111,37 @@ Already-backed-up folders need a one-time rename; see
 
 ## Part 2 — Backing things up, anytime
 
-All commands run from your backup folder:
+### Where and when do I run these?
+
+- **Where:** in a normal terminal (Terminal app, iTerm, VS Code terminal). Not
+  inside a Claude chat box. You don't need Claude Code open at all.
+- **When:** anytime. Mid-chat, after a chat, days later. Backing up a chat that
+  is still open just saves everything up to that moment; run it again later to
+  save the rest.
+- **Which chat:** any chat, by its session id. You don't have to open that chat
+  first. One terminal can back up all your chats, skills, and memory.
+- **From any folder:** use the full path, e.g.
+  `~/my-claude-backup/backup_memory.sh`. It always saves into your backup
+  folder, wherever you run it from.
+
+**Prefer not to use a terminal?** In any Claude Code chat, just ask Claude to
+run it. For example, paste one of these:
+
+```
+Run ~/my-claude-backup/backup_memory.sh
+```
+
+```
+Back up this chat: find this session's transcript (the newest .jsonl in
+~/.claude/projects/ for this project folder) and run
+~/my-claude-backup/backup_one_chat.sh with its id.
+```
+
+```
+Run ~/my-claude-backup/backup_one_skill.sh code-review-checklist
+```
+
+The examples below assume you're in the backup folder:
 
 ```bash
 cd ~/my-claude-backup
