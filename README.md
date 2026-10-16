@@ -1,125 +1,79 @@
 # claude-backup-toolkit
 
-## What is this, and why would I want it?
+Back up your Claude Code **chats, skills, and memory** to your own private
+GitHub repo, and restore them anytime.
 
-Claude Code keeps everything you've built up with it — your past chats, your
-custom skills, the things it has learned about you — as plain files in a hidden
-`~/.claude` folder on your laptop. Nothing backs that folder up. If your
-laptop dies, you reinstall, or you move to a new account, it's all gone.
+Claude Code keeps all of this as plain files in a hidden `~/.claude` folder on
+your laptop, and nothing backs it up. Lose the laptop, reinstall, or switch
+accounts, and it's gone. This toolkit copies it into a private repo you own.
+It **never deletes** from the backup: if you clear a chat in Claude Code, the
+backed-up copy stays.
 
-This toolkit copies those files into a **private GitHub repo you own**,
-organized by project, so you can browse old chats, restore anything you lose,
-and carry your setup to a new machine. It never deletes anything from the
-backup: if you clear a chat in Claude Code, the backed-up copy stays.
+---
 
-## What gets backed up
+## How it works (30-second version)
 
-| What | Where it lives on your laptop | What that means in practice |
-|---|---|---|
-| **Chats** | `~/.claude/projects/` | The full transcript of every Claude Code session, grouped by the project folder you ran it in. |
-| **Skills** | `~/.claude/skills/` | Your custom reusable instruction packs (each a folder with a `SKILL.md`). |
-| **Memory** | `~/.claude/memory/` | Notes Claude keeps about you and your preferences across sessions. |
-| **Project configs** | `<your-repo>/.claude/` | Per-project rules, handoff notes, and project-only skills inside each of your repos. `settings.local.json` is skipped on purpose — it can hold local permissions or tokens. |
+```
+ THIS repo (public)                 YOUR repo (private)
+ claude-backup-toolkit   ──clone──▶  ~/my-claude-backup  ──push──▶  github.com/<you>/my-claude-backup
+ just the scripts                    scripts + your chats,
+                                     skills, memory
+```
 
-## Prerequisites
+You clone this repo **once**, turn the copy into your own private repo, and
+from then on run one command whenever you want something backed up.
 
-Run each check command. If one fails, install that tool first.
+---
 
-- [ ] **bash** — `bash --version`
-- [ ] **python3** (no extra packages needed) — `python3 --version`
-- [ ] **rsync** — `rsync --version`
-- [ ] **git** — `git --version`
-- [ ] **GitHub CLI, logged in** — `gh auth status` (should say "Logged in to github.com"; if not, run `gh auth login`)
+## Part 1 — One-time setup
 
-## Install (first time, about 5 minutes)
+### Before you start
 
-> **Two repos, don't mix them up.** *This* repo (`claude-backup-toolkit`) is
-> just the scripts — public, shared. Your **backup repo** is a separate,
-> **private** repo that you create below; it's where your actual chats and
-> memory go. Never push your backup data to a public repo.
-
-**1. Clone the toolkit into a new folder that will become your backup repo.**
+Paste this. Every line should print a version or "Logged in". If one fails,
+install that tool first.
 
 ```bash
+bash --version | head -1
+python3 --version
+rsync --version | head -1
+git --version
+gh auth status          # if "not logged in": run  gh auth login
+```
+
+### Setup (copy-paste the whole block)
+
+Replace `my-claude-backup` if you want a different name.
+
+```bash
+# 1. Get the scripts into a new folder of your own
 git clone https://github.com/adityan-nd/claude-backup-toolkit.git ~/my-claude-backup
 cd ~/my-claude-backup
-```
 
-**2. Detach it from the toolkit repo**, so your data can never be pushed back here.
-
-```bash
+# 2. Cut the link to this public repo, so your data can never be pushed here
 git remote remove origin
-```
 
-**3. Make the scripts executable.**
-
-```bash
+# 3. Make the scripts runnable
 chmod +x *.sh
-```
 
-**4. Tell `names.py` what your projects are called.**
-
-Claude Code stores each project's chats in a folder named after the project's
-full path, with `/`, `.` and spaces turned into `-`. So
-`/Users/alice/code/my-app` becomes `-Users-alice-code-my-app`. That's ugly on
-GitHub, so `names.py` maps it to a clean name.
-
-See your own folder names:
-
-```bash
-ls ~/.claude/projects/
-```
-
-Then open `names.py` and add one line per project to `STATIC_MAP`:
-
-```python
-STATIC_MAP = {
-    "-Users-alice-code-my-app": "my-app",
-    "-Users-alice-work-billing-api": "billing-api",
-}
-```
-
-Skipping this is fine: anything not listed is still backed up, just under its
-ugly folder name. You can fix it later (see
-[docs/04-naming.md](docs/04-naming.md)).
-
-**5. Optional: list repos that have their own `.claude/` folder.**
-
-If any of your repos contain a `.claude/` folder (project rules, project
-skills), open `backup_claude.sh` and add their full paths to the `REPOS` array:
-
-```bash
-REPOS=(
-  "/Users/alice/code/my-app"
-  "/Users/alice/work/billing-api"
-)
-```
-
-Leave it empty if you don't use per-project `.claude/` folders. Chats, skills,
-and memory are backed up either way.
-
-**6. Create your own private GitHub repo for the backup.**
-
-```bash
+# 4. Create YOUR private GitHub repo and connect this folder to it
 gh repo create my-claude-backup --private --source=. --remote=origin
-```
 
-**7. Run the first backup.**
-
-```bash
+# 5. Copy everything in (chats, skills, memory) — this does NOT upload yet
 ./backup_claude.sh
 ```
 
-This copies everything into `chats/`, `skills/`, `memory/`, and
-`project-configs/`, and builds `chats/INDEX.md` (a table of every chat by
-title). **It does not commit or push** — that's on purpose, so you can look
-first.
+You should see something like:
 
-**8. Check for secrets, then commit and push.**
+```
+Rebuilt index: 42 sessions.
+Backup refreshed at: /Users/alice/my-claude-backup
+```
 
-Skim `git status`. Chat transcripts contain whatever you pasted into Claude,
-so if you ever pasted a password or API key, it's in there. See the secret
-scan in [docs/03-scripts.md](docs/03-scripts.md#secret-hygiene). Then:
+### Check, then upload
+
+Chats contain whatever you ever pasted into Claude. If you might have pasted a
+password or API key, run the scan in
+[docs/03-scripts.md](docs/03-scripts.md#secret-hygiene) first. Then:
 
 ```bash
 git add -A
@@ -127,79 +81,167 @@ git commit -m "First backup"
 git push -u origin main
 ```
 
-Done. Open your repo on GitHub and look at `chats/INDEX.md`.
+Open `https://github.com/<you>/my-claude-backup` and click `chats/INDEX.md`:
+a table of every chat with its title and project. **Setup done.**
 
-## Day-to-day usage
+### Optional: nicer folder names
 
-Run these from inside your backup folder (`cd ~/my-claude-backup`).
-
-**Back up everything** (new chats, skills, memory). Doesn't push; you commit:
+Your chats land in folders like `chats/-Users-alice-code-my-app` (Claude
+Code's internal name for `/Users/alice/code/my-app`). To get `chats/my-app`
+instead, see what folders you have:
 
 ```bash
-./backup_claude.sh
-git add -A && git commit -m "Weekly backup" && git push
+ls ~/.claude/projects/
 ```
 
-**Back up one chat** (commits and pushes by itself). Find the session id in
-`chats/INDEX.md`, or list newest transcripts for a project:
+and add a line per project to `STATIC_MAP` in `names.py`:
+
+```python
+STATIC_MAP = {
+    "-Users-alice-code-my-app": "my-app",
+}
+```
+
+Already-backed-up folders need a one-time rename; see
+[docs/04-naming.md](docs/04-naming.md). If some of your repos have their own
+`.claude/` folder (project rules, project skills), add their paths to the
+`REPOS` list in `backup_claude.sh` too.
+
+---
+
+## Part 2 — Backing things up, anytime
+
+All commands run from your backup folder:
 
 ```bash
-ls -t ~/.claude/projects/-Users-alice-code-my-app/*.jsonl | head -3
+cd ~/my-claude-backup
+```
+
+| I want to... | Run | Uploads by itself? |
+|---|---|---|
+| Back up **one chat** | `./backup_one_chat.sh <session-id>` | Yes |
+| Back up **one skill** | `./backup_one_skill.sh <skill-name>` | Yes |
+| Back up **all memory** | `./backup_memory.sh` | Yes |
+| Back up **one memory file** | `./backup_one_memory.sh <file-name>` | Yes |
+| Back up **everything** | `./backup_claude.sh` then `git add -A && git commit -m "backup" && git push` | No, you push |
+
+**Updating** something you already backed up is the same command again. It
+re-copies the latest version and only uploads if something changed.
+
+### Example: back up one chat
+
+Each chat has a **session id**. Find it by the chat's title (the name shown in
+Claude Code's sidebar):
+
+```bash
+grep -l '"customTitle":"Fix login bug"' ~/.claude/projects/*/*.jsonl
+```
+
+```
+/Users/alice/.claude/projects/-Users-alice-code-my-app/352e1295-2261-402d-a7f3-577bb6c9059d.jsonl
+```
+
+The file name (without `.jsonl`) is the session id:
+
+```bash
 ./backup_one_chat.sh 352e1295-2261-402d-a7f3-577bb6c9059d
 ```
 
-Running it again on the same id updates that chat. It only commits if
-something changed.
+```
+Pushed: Fix login bug (352e1295-2261-402d-a7f3-577bb6c9059d)
+```
 
-**Back up one skill** (folder name under `~/.claude/skills/`; commits and pushes):
+Chat has no title? List the newest chats instead:
+`ls -t ~/.claude/projects/*/*.jsonl | head -5`
+
+### Example: back up one skill
+
+See your skills, then pick one by its folder name:
+
+```bash
+ls ~/.claude/skills/
+```
+
+```
+code-review-checklist   release-notes
+```
 
 ```bash
 ./backup_one_skill.sh code-review-checklist
 ```
 
-**Back up all memory** (no arguments; commits and pushes):
+```
+Pushed skill: code-review-checklist
+```
+
+### Example: back up memory
+
+Just everything, no arguments:
 
 ```bash
 ./backup_memory.sh
 ```
 
-**Back up one memory file** (commits and pushes):
+```
+Pushed full memory refresh.
+```
+
+Or one file (`ls ~/.claude/memory/` to see names):
 
 ```bash
 ./backup_one_memory.sh user-profile.md
 ```
 
-To restore onto a new laptop, see [docs/06-restore.md](docs/06-restore.md).
+### Example: you edited a skill and want the new version saved
+
+Same command as before:
+
+```bash
+./backup_one_skill.sh code-review-checklist
+```
+
+```
+Pushed skill: code-review-checklist          # if it changed
+No changes for skill 'code-review-checklist' — already up to date.   # if not
+```
+
+---
+
+## Part 3 — Getting it back
+
+Deleted a chat, or on a new laptop? Clone your private repo and copy the files
+back where Claude Code expects them:
+
+```bash
+git clone https://github.com/<you>/my-claude-backup.git ~/my-claude-backup
+cd ~/my-claude-backup
+rsync -a memory/ ~/.claude/memory/
+rsync -a skills/ ~/.claude/skills/
+```
+
+Chats need one extra step (matching the project folder name); see
+[docs/06-restore.md](docs/06-restore.md). To find a deleted chat by title,
+look it up in `chats/INDEX.md`.
+
+---
 
 ## Troubleshooting
 
-**`gh: command not found` or "not logged in"**
-Install the GitHub CLI, then run `gh auth login` and pick GitHub.com + HTTPS.
+| Problem | Fix |
+|---|---|
+| `gh: command not found` / not logged in | Install GitHub CLI, then `gh auth login` |
+| `Permission denied` running a script | `chmod +x *.sh` |
+| `backup_one_*.sh` fails at `git push` | Folder has no remote yet: run step 4 of setup |
+| `Session ... not found` | Use the id from the `.jsonl` file name (see example above), not the id in the Claude desktop app, which starts with `local_` and can differ |
+| Ugly folder like `chats/-Users-alice-...` | Add it to `STATIC_MAP` in `names.py` ([docs/04-naming.md](docs/04-naming.md)) |
+| `project-configs/` is empty | Normal unless you added repos to `REPOS` in `backup_claude.sh` |
 
-**`Permission denied` when running `./backup_claude.sh`**
-The scripts aren't executable yet: `chmod +x *.sh`.
-
-**`backup_one_*.sh` fails at `git push`**
-Your backup folder has no remote yet. Do step 6 above.
-
-**Nothing under `project-configs/`**
-The `REPOS` array in `backup_claude.sh` is empty, or none of those repos has a
-`.claude/` folder. Expected if you skipped step 5.
-
-**A folder like `chats/-Users-alice-code-my-app` showed up**
-That project isn't in `STATIC_MAP` yet. Add it to `names.py` and follow
-[docs/04-naming.md](docs/04-naming.md) to rename the existing folder.
-
-**`backup_one_chat.sh` says "Session ... not found"**
-Use the file id, not the id shown in the Claude desktop app. The app's id
-starts with `local_` and can differ from the transcript's file name. Use an id
-from `chats/INDEX.md` or from `ls ~/.claude/projects/<project>/`.
+---
 
 ## Docs
 
-Start at [docs/README.md](docs/README.md) for the full walkthrough: overview,
-setup, every script explained, the naming system, the session index, and
-restore steps.
+Full details on every script, naming, the chat index, and restoring:
+[docs/README.md](docs/README.md).
 
 ## License
 
