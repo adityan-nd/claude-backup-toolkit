@@ -32,12 +32,37 @@ def looks_fake(value: str) -> bool:
     steps = sum(1 for a, b in zip(body, body[1:]) if ord(b) == ord(a) + 1)
     return len(body) > 1 and steps / (len(body) - 1) > 0.5
 
+# The base64 alphabet, and nothing else: "_", "-" and "=" are deliberately
+# excluded so GOOGLE_API_KEY=AIza... and xoxb-123-456-abc stay intact rather
+# than merging into their surroundings.
+B64_CHARS = set(string.ascii_letters + string.digits + "+/")
+SLACK = 16  # room for a little adjacent noise before we call it a blob
+
+def _inside_blob(text: str, start: int, end: int) -> bool:
+    """True when the match is a chance substring of a much longer base64 run.
+
+    Tool output embeds big base64 blobs; a 12,000-char run contains "AIza"
+    plus 35 random chars by coincidence. A genuine key is a whole token, so
+    its run is its own length. Random slices look random, so looks_fake()
+    cannot tell these apart - only the surroundings can.
+    """
+    i, j = start, end
+    while i > 0 and text[i - 1] in B64_CHARS:
+        i -= 1
+    while j < len(text) and text[j] in B64_CHARS:
+        j += 1
+    return (j - i) > (end - start) + SLACK
+
 def findings(text: str):
     for name, pat in PATTERNS:
         for m in pat.finditer(text):
             value = m.group(0)
             if name == "AWS access key ID" and text[max(0, m.start() - 12):m.start()].endswith("Credential="):
                 continue  # key ID inside a pre-signed S3 link
+            # Not for private keys: that pattern is *meant* to span the base64
+            # body that follows the header.
+            if name != "private key" and _inside_blob(text, m.start(), m.end()):
+                continue
             if name != "private key" and looks_fake(value):
                 continue
             yield name, value
@@ -68,6 +93,11 @@ def self_test():
         "github": "token gh" + "p_" + rand(alnum, 36),
         "slack": "xox" + "b-" + rand(string.digits, 12) + "-" + rand(string.digits, 12) + "-" + rand(alnum, 24),
         "pem": "-----BEGIN RSA " + "PRIVATE KEY-----\\n" + rand(alnum + "+/", 64),
+        # The blob rule must not swallow keys written the usual ways.
+        "env assignment": "GOOGLE_MAPS_API_KEY=AIza" + rand(alnum + "_-", 35),
+        "json quoted": '{"apiKey":"AIza' + rand(alnum + "_-", 35) + '"}',
+        "long slack": "xox" + "p-" + rand(string.digits, 14) + "-" + rand(string.digits, 14)
+                      + "-" + rand(string.digits, 14) + "-" + rand(alnum, 32),
     }
     fake = {
         "zeros": "AKIA" + "0" * 16,
@@ -79,6 +109,12 @@ def self_test():
         "presigned": "s3.jpeg?X-Amz-Credential=AKIA" + rand(up, 16) + "%2F20260923",
         "pem mention": "your private key starts with `-----BEGIN OPENSSH " + "PRIVATE KEY-----`, never paste it",
         "pem fixture": "-----BEGIN RSA " + "PRIVATE KEY-----\\nabc\\n",
+        # Real case from these transcripts: tool output carrying a big base64
+        # blob that happens to contain "AIza" + 35 random chars partway in.
+        "aiza inside base64 blob":
+            rand(alnum + "+/", 400) + "AIza" + rand(alnum, 35) + rand(alnum + "+/", 400),
+        "akia inside base64 blob":
+            rand(alnum + "+/", 300) + "AKIA" + rand(up, 16) + rand(alnum + "+/", 300),
     }
     for k, v in real.items():
         assert list(findings(v)), f"missed real secret: {k}"

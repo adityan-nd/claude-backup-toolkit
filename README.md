@@ -156,14 +156,40 @@ cd ~/my-claude-backup
 
 | I want to... | Run | Uploads by itself? |
 |---|---|---|
+| Back up **everything** | `./backup.sh` | Yes |
 | Back up **one chat** | `./backup_one_chat.sh <session-id>` | Yes |
 | Back up **one skill** | `./backup_one_skill.sh <skill-name>` | Yes |
 | Back up **all memory** | `./backup_memory.sh` | Yes |
 | Back up **one memory file** | `./backup_one_memory.sh <file-name>` | Yes |
-| Back up **everything** | `./backup_claude.sh` then `git add -A && git commit -m "backup" && git push` | No, you push |
+| Copy everything in, **without** committing | `./backup_claude.sh` | No |
+
+Most of the time it's just:
+
+```bash
+./backup.sh
+```
+
+That refreshes everything, checks it for secrets, commits and pushes. If it
+finds a possible secret it stops and commits nothing. Only transcripts that
+actually changed are re-read, so a routine run takes seconds. Add `--no-push`
+to commit locally and look before uploading.
 
 **Updating** something you already backed up is the same command again. It
 re-copies the latest version and only uploads if something changed.
+
+### Screenshots and attachments
+
+Claude Code inlines every screenshot, PDF and attachment into the chat
+transcript as base64, and re-sends the same image on each turn it stays in
+context. Transcripts get big — hundreds of megabytes for a browser- or
+simulator-heavy session — and **GitHub refuses any file over 100 MiB**, so the
+push fails.
+
+The toolkit handles this for you: attachments are stored once per session
+under `chats/<project>/<session-id>/media/`, and the transcript keeps a
+reference. Nothing is lost — `python3 media.py restore` rebuilds the original
+transcript byte-for-byte before you copy it back. You don't need to run
+anything extra; `backup.sh` and `backup_one_chat.sh` already do it.
 
 ### Example: back up one chat
 
