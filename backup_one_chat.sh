@@ -22,7 +22,11 @@ for SID in "$@"; do
       found=1
       clean="$(python3 -c "import sys; sys.path.insert(0, '$DEST'); import names; print(names.resolve(sys.argv[1]))" "$slug")"
       mkdir -p "$DEST/chats/$clean"
-      cp "${projdir}${SID}.jsonl" "$DEST/chats/$clean/"
+      # Same media handling as backup.sh: screenshots/PDFs/audio go to
+      # chats/<project>/<session>/media/ so the transcript stays text and
+      # can never blow past GitHub's 100 MiB per-file limit.
+      python3 "$DEST/media.py" extract "${projdir}${SID}.jsonl" \
+        "$DEST/chats/$clean/${SID}.jsonl" "$DEST/chats/$clean/${SID}/media"
       if [ -d "${projdir}${SID}" ]; then
         mkdir -p "$DEST/chats/$clean/${SID}"
         rsync -a --exclude='.DS_Store' "${projdir}${SID}/" "$DEST/chats/$clean/${SID}/"
