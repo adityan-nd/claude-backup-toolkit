@@ -22,7 +22,7 @@ Usage:
   media.py restore <src.jsonl> <dst.jsonl> <media-dir>
   media.py --self-test
 """
-import base64, binascii, hashlib, json, os, sys
+import base64, binascii, hashlib, json, os, shutil, sys
 
 REF_TYPE = "claude-backup-ref"
 
@@ -181,19 +181,31 @@ def sync(projects_root, dest_chats):
             done += 1
             all_warn += [f"{clean}/{fname}: {w}" for w in warn]
 
-            # Sidecar files Claude Code keeps beside the transcript
-            # (custom-title.json and friends) - copied, never media-stripped.
-            side = os.path.join(projdir, sid)
-            if os.path.isdir(side):
-                out = os.path.join(dest_chats, clean, sid)
-                os.makedirs(out, exist_ok=True)
-                for f in os.listdir(side):
-                    s, d = os.path.join(side, f), os.path.join(out, f)
-                    if os.path.isfile(s) and not (
-                        os.path.exists(d) and os.path.getmtime(d) >= os.path.getmtime(s)
-                    ):
-                        with open(s, "rb") as a, open(d, "wb") as b:
-                            b.write(a.read())
+        # Everything else in the project folder, at any depth: subagent
+        # transcripts, tool-results/, the project's memory/ notes, sidecar
+        # .json files. Skipping sub-folders here would silently drop them.
+        # Nested transcripts (subagents) carry screenshots too, so they get
+        # the same media split, into their session's media/ folder.
+        for dirpath, _, files in os.walk(projdir):
+            for f in files:
+                s = os.path.join(dirpath, f)
+                rel = os.path.relpath(s, projdir)
+                if f == ".DS_Store" or (os.sep not in rel and f.endswith(".jsonl")):
+                    continue  # top-level transcripts are handled above
+                d = os.path.join(dest_chats, clean, rel)
+                try:
+                    if os.path.exists(d) and os.path.getmtime(d) >= os.path.getmtime(s):
+                        continue
+                    if f.endswith(".jsonl"):
+                        top = rel.split(os.sep)[0]
+                        _, n, warn = extract(s, d, os.path.join(dest_chats, clean, top, "media"))
+                        blobs += n
+                        all_warn += [f"{clean}/{rel}: {w}" for w in warn]
+                    else:
+                        os.makedirs(os.path.dirname(d), exist_ok=True)
+                        shutil.copy2(s, d)
+                except OSError as e:
+                    all_warn.append(f"{clean}/{rel}: {e}")
 
     print(f"  transcripts: {done} updated, {skipped} already current")
     print(f"  media files: {blobs} written")
@@ -253,6 +265,29 @@ def _self_test():
         orig = [json.loads(l) for l in open(src)]
         rt = [json.loads(l) for l in open(back)]
         assert orig == rt, "round-trip changed the transcript"
+
+        # sync must keep everything in a project folder, not just transcripts.
+        proj = os.path.join(tmp, "projects", "-proj")
+        sub = os.path.join(proj, "sid1", "subagents")
+        os.makedirs(sub)
+        os.makedirs(os.path.join(proj, "memory"))
+        os.makedirs(os.path.join(proj, "sid1", "tool-results"))
+        shutil.copy(src, os.path.join(proj, "sid1.jsonl"))
+        shutil.copy(src, os.path.join(sub, "agent-a.jsonl"))
+        for rel in ("memory/MEMORY.md", "sid1/tool-results/r.txt",
+                    "sid1/custom-title.json", "x.desktop-released.json"):
+            with open(os.path.join(proj, rel), "w") as f:
+                f.write("keep me")
+        out = os.path.join(tmp, "chats")
+        sync(os.path.join(tmp, "projects"), out)
+        got = os.path.join(out, "-proj")
+        for rel in ("sid1.jsonl", "sid1/subagents/agent-a.jsonl", "memory/MEMORY.md",
+                    "sid1/tool-results/r.txt", "sid1/custom-title.json",
+                    "x.desktop-released.json"):
+            assert os.path.exists(os.path.join(got, rel)), f"sync dropped {rel}"
+        assert b64 not in open(os.path.join(got, "sid1/subagents/agent-a.jsonl")).read(), \
+            "subagent transcript kept its base64"
+        assert len(os.listdir(os.path.join(got, "sid1", "media"))) == 2, "media not shared per session"
         print("self-test passed")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
