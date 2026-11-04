@@ -80,7 +80,14 @@ What it does, in order:
    at the top of the script — add your own repos here), if it has a
    `.claude/` directory, copies it into `project-configs/<repo-name>/.claude/`,
    excluding `settings.local.json` (can hold local permission grants/tokens
-   you don't want in git).
+   you don't want in git). It also copies the repo's **personal layer** into
+   `project-configs/<repo-name>/personal/` with `personal.py`: every file you
+   keep out of git through `.git/info/exclude` (prompt files, drafts, local
+   docker setups) plus untracked files in nested `.claude/` folders. git lists
+   that set exactly. Generated folders (`graphify-out`, `node_modules`, …),
+   Claude Code's own state, likely-secret files (`.env*`, `*.pem`, `*.key`) and
+   files over 50 MB are skipped. `python3 personal.py list <repo>` shows what
+   will be copied.
 5. **Rebuilds the index** — calls `index.py rebuild` (see
    [05-indexing.md](05-indexing.md)).
 

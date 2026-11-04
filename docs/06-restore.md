@@ -47,6 +47,15 @@ internal path-slug directory under `~/.claude/projects/`. Two cases:
 rsync -a "project-configs/<repo-name>/.claude/" "/path/to/<repo-name>/.claude/"
 ```
 
+Then put the repo's personal layer back (files you kept out of git):
+
+```bash
+python3 personal.py restore "project-configs/<repo-name>/personal" "/path/to/<repo-name>"
+```
+
+It never overwrites a file that already exists and differs; it lists those so
+you can decide. Add `--force` to replace them with the backed-up copy.
+
 `settings.local.json` was deliberately excluded from the backup (it can hold
 local permission grants/tokens) — recreate it fresh in the new environment
 rather than restoring it.
