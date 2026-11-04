@@ -51,6 +51,12 @@ for repo in ${REPOS[@]+"${REPOS[@]}"}; do  # this form survives an empty list on
     rsync -a --exclude='.DS_Store' --exclude='settings.local.json' \
       "$repo/.claude/" "$DEST/project-configs/$name/.claude/"
   fi
+  # 4b. The repo's personal layer: files you keep out of git with
+  #     .git/info/exclude, plus untracked files in nested .claude/ folders.
+  #     See personal.py for what it skips (generated folders, secrets, >50 MB).
+  if [ -e "$repo/.git" ]; then  # -e: a worktree's .git is a file
+    python3 "$DEST/personal.py" backup "$repo" "$DEST/project-configs/$name/personal"
+  fi
 done
 
 # 5. Rebuild the chat index (session_id -> title -> repo/folder)

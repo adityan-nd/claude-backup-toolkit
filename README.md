@@ -98,6 +98,12 @@ REPOS=(
 )
 ```
 
+For each repo it also saves the **personal layer**: files you keep out of git
+in `.git/info/exclude` (prompts, drafts, local configs) and untracked files in
+nested `.claude/` folders, into `project-configs/<repo>/personal/`. Preview it
+with `python3 personal.py list /path/to/repo`; restore with
+`python3 personal.py restore project-configs/<repo>/personal /path/to/repo`.
+
 <details>
 <summary>Manual setup (what the installer does, step by step)</summary>
 
